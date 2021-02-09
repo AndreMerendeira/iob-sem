@@ -2,4 +2,4 @@
 include $(SEM_DIR)/software/software.mk
 
 #embeded sources
-#SRC+=$(SEM_SW_DIR)/embedded/sem_platform.c
+SRC+=$(SEM_SW_DIR)/embedded/sem_platform.c
