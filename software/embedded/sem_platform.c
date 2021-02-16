@@ -169,3 +169,17 @@ void err_injection_cmd (unsigned int slr, unsigned int lfa, unsigned int word, u
 
 	wait_resp();
 }
+
+/*############################################
+Sends xmem command to read a byte from <address> (8 digits) 
+from external flash and waits for response
+############################################*/
+void xmem_cmd() {
+	
+	idle_cmd();
+
+	uart_printf_i(1,"X 00000000\r"); //Send xmem command
+
+	wait_resp();
+}
+

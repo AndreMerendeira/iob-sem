@@ -9,12 +9,12 @@
 //  \   \        Module:        sem_ultra_0_support_wrapper
 //  /   /        Filename:      sem_ultra_0_support_wrapper.v
 // /___/   /\    Purpose:       Wrapper file for the support module.
-// \   \  /  \                  
+// \   \  /  \
 //  \___\/\___\
 //
 /////////////////////////////////////////////////////////////////////////////
 //
-// (c) Copyright 2014-2017 Xilinx, Inc. All rights reserved.
+// (c) Copyright 2014-2020 Xilinx, Inc. All rights reserved.
 //
 // This file contains confidential and proprietary information
 // of Xilinx, Inc. and is protected under U.S. and
@@ -58,7 +58,7 @@
 // regulations governing limitations on product liability.
 //
 // THIS COPYRIGHT NOTICE AND DISCLAIMER MUST BE RETAINED AS
-// PART OF THIS FILE AT ALL TIMES. 
+// PART OF THIS FILE AT ALL TIMES.
 //
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -68,9 +68,9 @@
 // intended for instantiation in the user design.  This module includes the
 // instantiation of the SEM IP, a BUFGCE to distribute the system clock,
 // and any relevant helper blocks and configuration system primitives that
-// are not structurally included in the IP.  Xilinx recommends that users 
-// instantiate this module to integrate the full solution into their design, 
-// and tie off any unused ports. 
+// are not structurally included in the IP.  Xilinx recommends that users
+// instantiate this module to integrate the full solution into their design,
+// and tie off any unused ports.
 //
 // Refer to PG187 Chapter 5 for more information.
 //
@@ -81,6 +81,11 @@
 // Name                          Type   Description
 // ============================= ====== ====================================
 // clk                           input  Input system clock
+//
+// fetch_tbladdr[31:0]           input  Input address to PicoBlaze, indicates
+//                                      the start address of the classification
+//                                      data table in external memory.  Synchronous
+//                                      to icap_clk.
 //
 // icap_clk_out                  output Globally routed system clock.  Used
 //                                      to drive ICAP, controller and all
@@ -136,12 +141,26 @@
 //                                      icap_clk and oversampled.  Uses 8N1
 //                                      protocol.
 //
-// command_strobe                input  Command strobe signal, used to 
+// spi_c                         output SPI bus clock.  When running, this
+//                                      clock is locked in frequency to one
+//                                      half the icap_clk frequency.  This
+//                                      signal is synchronous to icap_clk.
+//
+// spi_d                         output SPI bus data, master to slave.
+//                                      Synchronous to icap_clk.
+//
+// spi_s_n                       output SPI bus slave select.  Synchronous
+//                                      to icap_clk.
+//
+// spi_q                         input  SPI bus data, slave to master.
+//                                      Synchronous to icap_clk.
+//
+// command_strobe                input  Command strobe signal, used to
 //                                      capture command_code.  Pulse for
 //                                      one cycle.  Synchronous to icap_clk.
 //
-// command_busy                  output Command busy signal, used to 
-//                                      indicate the command port is 
+// command_busy                  output Command busy signal, used to
+//                                      indicate the command port is
 //                                      unavailable.  Synchronous to icap_clk.
 //
 // command_code[39:0]            input  Command input bus.  Synchronous to
@@ -154,10 +173,10 @@
 //
 // cap_req                      output  ICAP arbitration output for the
 //                                      controller to request access to the
-//                                      external ICAP. Synchronous to icap_clk. 
+//                                      external ICAP. Synchronous to icap_clk.
 //
 // cap_rel                      input   ICAP arbitration input for the
-//                                      controller to receive request 
+//                                      controller to receive request
 //                                      for access of the external ICAP.
 //                                      Synchronous to icap_clk.
 //
@@ -166,10 +185,10 @@
 //
 //
 // aux_error_cr_es              input   Auxiliary correctable essential error
-//                                      indication. 
+//                                      indication.
 //
 //
-// aux_error_cr_uc              input   Auxiliary uncorrectable error  
+// aux_error_cr_uc              input   Auxiliary uncorrectable error
 //                                      indication.
 //
 /////////////////////////////////////////////////////////////////////////////
@@ -181,6 +200,8 @@
 // +- sem_ultra_0            (SEM Controller)
 // |
 // +- sem_ultra_0_uart
+// |
+// +- sem_ultra_0_spi
 // |
 // \- BUFGCE (unisim)
 //
@@ -194,6 +215,7 @@
 
 module sem_ultra_0_support_wrapper (
   input  wire        clk,
+  input  wire [31:0] fetch_tbladdr,
 
 // Status interface
   output wire        status_heartbeat,
@@ -203,7 +225,7 @@ module sem_ultra_0_support_wrapper (
   output wire        status_classification,
   output wire        status_injection,
   output wire        status_diagnostic_scan,
-  output wire        status_detect_only,  
+  output wire        status_detect_only,
   output wire        status_essential,
   output wire        status_uncorrectable,
 
@@ -211,12 +233,18 @@ module sem_ultra_0_support_wrapper (
   output wire        uart_tx,
   input  wire        uart_rx,
 
+// SPI bus interface
+  output wire        spi_c,
+  output wire        spi_d,
+  output wire        spi_s_n,
+  input  wire        spi_q,
+
 // Command interface
   input  wire        command_strobe,
   output wire        command_busy,
   input  wire [39:0] command_code,
 
-// Routed system clock 
+// Routed system clock
   output wire        icap_clk_out,
 
 // ICAP arbitration interface
@@ -246,11 +274,17 @@ module sem_ultra_0_support_wrapper (
   wire        monitor_rxread;
   wire        monitor_rxempty;
 
+  wire  [7:0] fetch_txdata;
+  wire        fetch_txwrite;
+  wire        fetch_txfull;
+  wire  [7:0] fetch_rxdata;
+  wire        fetch_rxread;
+  wire        fetch_rxempty;
 
   wire        icap_clk_i;
 
   ///////////////////////////////////////////////////////////////////////////
-  // Instantiate the clocking primitives. 
+  // Instantiate the clocking primitives.
   ///////////////////////////////////////////////////////////////////////////
 
   BUFGCE example_bufg (
@@ -264,9 +298,9 @@ module sem_ultra_0_support_wrapper (
   ///////////////////////////////////////////////////////////////////////////
   // Instantiate the support module. Xilinx recommends that the support
   // module be instantiated in the user design. Unused ports may be tied
-  // off. Refer to the SEM IP PG187 for more information 
+  // off. Refer to the SEM IP PG187 for more information
   //
-  // The port list is dynamic based on the IP core options and where 
+  // The port list is dynamic based on the IP core options and where
   // the helper blocks and configuration primitives are located.
   ///////////////////////////////////////////////////////////////////////////
   sem_ultra_0 example_support (
@@ -287,8 +321,15 @@ module sem_ultra_0_support_wrapper (
     .monitor_rxdata(monitor_rxdata),
     .monitor_rxread(monitor_rxread),
     .monitor_rxempty(monitor_rxempty),
- 
- 
+    .fetch_txdata(fetch_txdata),
+    .fetch_txwrite(fetch_txwrite),
+    .fetch_txfull(fetch_txfull),
+    .fetch_rxdata(fetch_rxdata),
+    .fetch_rxread(fetch_rxread),
+    .fetch_rxempty(fetch_rxempty),
+    .fetch_tbladdr(fetch_tbladdr),
+
+
     .command_strobe(command_strobe),
     .command_busy(command_busy),
     .command_code(command_code),
@@ -301,7 +342,7 @@ module sem_ultra_0_support_wrapper (
   );
 
   ///////////////////////////////////////////////////////////////////////////
-  // Instantiate the uart module. 
+  // Instantiate the uart module.
   ///////////////////////////////////////////////////////////////////////////
   sem_ultra_0_uart example_uart (
     .icap_clk(icap_clk_i),
@@ -313,6 +354,22 @@ module sem_ultra_0_support_wrapper (
     .monitor_rxdata(monitor_rxdata),
     .monitor_rxread(monitor_rxread),
     .monitor_rxempty(monitor_rxempty));
+
+  ///////////////////////////////////////////////////////////////////////////
+  // Instantiate the spi module.
+  ///////////////////////////////////////////////////////////////////////////
+  sem_ultra_0_spi example_spi (
+    .icap_clk(icap_clk_i),
+    .spi_c(spi_c),
+    .spi_d(spi_d),
+    .spi_s_n(spi_s_n),
+    .spi_q(spi_q),
+    .fetch_txdata(fetch_txdata),
+    .fetch_txwrite(fetch_txwrite),
+    .fetch_txfull(fetch_txfull),
+    .fetch_rxdata(fetch_rxdata),
+    .fetch_rxread(fetch_rxread),
+    .fetch_rxempty(fetch_rxempty));
 
 
 endmodule

@@ -70,3 +70,10 @@ Injects an error (bit flip) in <bit>, of <word> in <lfa> (Linear Frame Address),
 of <slr> (Super Logic Region)
 ############################################*/
 void err_injection_cmd (unsigned int slr, unsigned int lfa, unsigned int word, unsigned int bit);
+
+/*############################################
+Sends xmem command to read a byte from <address> (8 digits) 
+from external flash and waits for response
+############################################*/
+void xmem_cmd();
+

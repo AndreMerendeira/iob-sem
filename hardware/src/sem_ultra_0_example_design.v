@@ -59,7 +59,7 @@
 // regulations governing limitations on product liability.
 //
 // THIS COPYRIGHT NOTICE AND DISCLAIMER MUST BE RETAINED AS
-// PART OF THIS FILE AT ALL TIMES. 
+// PART OF THIS FILE AT ALL TIMES.
 //
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -123,6 +123,10 @@
 module sem_ultra_0_example_design (
   input  wire        clk,
 
+  output wire        spi_c,
+  output wire        spi_d,
+  output wire        spi_s_n,
+  input  wire        spi_q,
 
   output wire        uart_tx,
   input  wire        uart_rx
@@ -134,7 +138,7 @@ module sem_ultra_0_example_design (
 
   localparam TCQ = 1;
   localparam COUNT_1SEC   = 100000000;
-  localparam HB_COUNTER_WIDTH = LOGBASE2(COUNT_1SEC); 
+  localparam HB_COUNTER_WIDTH = LOGBASE2(COUNT_1SEC);
 
   ///////////////////////////////////////////////////////////////////////////
   // Define local function.
@@ -157,6 +161,7 @@ module sem_ultra_0_example_design (
   wire        clk_ibufg;
   wire        icap_clk;
 
+  wire [31:0] fetch_tbladdr;
 
   wire        status_heartbeat;
   wire        status_initialization;
@@ -171,11 +176,11 @@ module sem_ultra_0_example_design (
 
   //Status error signals
   wire heartbeat_valid;
-  reg  [HB_COUNTER_WIDTH-1:0] heartbeat_cnt; 
+  reg  [HB_COUNTER_WIDTH-1:0] heartbeat_cnt;
   reg heartbeat_timeout;
   reg heartbeat_timeout_sticky;
 
-  wire [3:0] status_sig; 
+  wire [3:0] status_sig;
   reg status_irregular_sticky;
   reg status_halt;
 
@@ -187,7 +192,7 @@ module sem_ultra_0_example_design (
     .O(clk_ibufg));
 
   ///////////////////////////////////////////////////////////////////////////
-  // Instantiate the support wrapper layer, which includes the SEM 
+  // Instantiate the support wrapper layer, which includes the SEM
   // controller, configuration primitives, and the IP helper blocks
   ///////////////////////////////////////////////////////////////////////////
 
@@ -200,11 +205,16 @@ module sem_ultra_0_example_design (
     .status_classification(status_classification),
     .status_injection(status_injection),
     .status_diagnostic_scan(status_diagnostic_scan),
-    .status_detect_only(status_detect_only), 
+    .status_detect_only(status_detect_only),
     .status_essential(status_essential),
     .status_uncorrectable(status_uncorrectable),
     .uart_tx(uart_tx),
     .uart_rx(uart_rx),
+    .fetch_tbladdr(fetch_tbladdr),
+    .spi_c(spi_c),
+    .spi_d(spi_d),
+    .spi_s_n(spi_s_n),
+    .spi_q(spi_q),
     .command_strobe(0),
     .command_busy(),
     .command_code(0),
@@ -232,7 +242,7 @@ module sem_ultra_0_example_design (
     begin
       if (status_heartbeat == 1'b1)
         heartbeat_cnt <= 'd0;
-      else        
+      else
         heartbeat_cnt <= heartbeat_cnt + 1;
     end
 
@@ -243,14 +253,14 @@ module sem_ultra_0_example_design (
     end
     else
       heartbeat_timeout <= 1'b0;
-      
-  end 
+
+  end
 
   ///////////////////////////////////////////////////////////////////////////
   // Verify other behaviors of the status signals that indicate the
   // current controller state.
   // status_irregular_sticky - sticky signal that asserts if more than
-  //                           one status signal is asserted in the  
+  //                           one status signal is asserted in the
   //                           same clock cycle
   // status_halt             - asserts when IP is halted (all status
   //                           signals are asserted)
@@ -266,7 +276,7 @@ module sem_ultra_0_example_design (
 
     status_halt <= (status_observation && status_diagnostic_scan && status_detect_only && status_initialization && status_correction && status_classification && status_injection);
 
-  end  
+  end
 
 endmodule
 
