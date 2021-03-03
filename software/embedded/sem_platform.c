@@ -158,6 +158,8 @@ void err_injection_cmd (unsigned int slr, unsigned int lfa, unsigned int word, u
 	char cmd_buffer [15] = "";
 	unsigned int location = 0;
 
+	uart_printf("Injecting error frame: %d\t word: %d\t bit: %d\n", lfa, word, bit);	
+	
 	idle_cmd();
 	//Assemble the location
 	location |= bit;
