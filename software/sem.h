@@ -66,6 +66,11 @@ Prints the contents of <lfa> Configuration Frame present in <slr> (Super Logic R
 void query_cmd (unsigned int slr, unsigned int lfa, unsigned int word, unsigned int bit);
 
 /*############################################
+Injects error in given 10 digits hex address
+############################################*/
+void err_injection_cmd_in_addr (char addr [10]);
+
+/*############################################
 Injects an error (bit flip) in <bit>, of <word> in <lfa> (Linear Frame Address),
 of <slr> (Super Logic Region)
 ############################################*/
